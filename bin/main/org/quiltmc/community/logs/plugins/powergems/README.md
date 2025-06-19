@@ -1,68 +1,53 @@
 # PowerGems Log Processors
 
-This directory contains log processors specifically designed to handle PowerGems plugin logs and provide helpful troubleshooting information.
+This package contains specialized log processors for handling PowerGems plugin logs and errors.
 
-## Processors
+## Features
 
 ### PowerGemsDebugProcessor
-Handles PowerGems debug output and configuration dumps.
+- **Configuration Dumps**: Processes PowerGems configuration debug dumps with proper Discord embed formatting
+- **Exception Analysis**: Detects and analyzes PowerGems-specific exceptions
+- **No Truncation**: Displays complete configuration values without truncation
+- **Multi-Embed Output**: Creates separate embeds for each configuration manager
+- **User Guidance**: Provides actionable advice for configuration issues
 
-**Features:**
-- Detects fake debug exceptions vs real errors
-- Analyzes configuration dumps from debug commands
-- Provides recommendations for common configuration issues
-- Checks for debug mode, gem decay settings, cooldown configurations, and disabled gems
-- Creates paged embeds for configuration data
-
-### PowerGemsCommandProcessor
-Specialized processor for PowerGems command errors.
-
-**Features:**
-- Detects GiveGem command errors (index out of bounds, invalid arguments)
-- Handles UpgradeGem and RemoveGem command failures
-- Provides specific command syntax guidance
-- Identifies missing arguments and null pointer errors
-- Offers examples of correct command usage
-
-### PowerGemsErrorProcessor
-Processes PowerGems error messages and warnings.
-
-**Features:**
-- Detects plugin disable events and suggests causes
-- Handles dependency errors (especially SealLib)
-- Identifies database connection issues
-- Processes WorldGuard integration errors
-- Catches gem creation failures and configuration errors
-- Handles permission-related errors
+### PowerGemsErrorProcessor  
+- **Plugin Errors**: Handles PowerGems plugin initialization and runtime errors
+- **Dependency Issues**: Detects missing or incompatible dependencies
+- **Configuration Errors**: Identifies malformed configuration files
+- **User Guidance**: Provides specific troubleshooting steps
 
 ### PowerGemsPlayerProcessor
-Focuses on player-related PowerGems issues and interactions.
-
-**Features:**
-- Detects attempts to use disabled gems
-- Identifies excessive cooldown violations (potential spam)
-- Handles corrupted/invalid gem detection
-- Catches gem level limit violations
-- Processes region restriction messages
-- Handles permission denied issues
-- Detects inventory full problems during gem distribution
-- Monitors gem upgrade failures
-- Tracks multiple gems violations
-- Reports gem decay events
+- **Player Interactions**: Handles gem-related player interaction issues
+- **Permission Problems**: Detects insufficient permissions for gem operations
+- **Inventory Issues**: Identifies gem inventory conflicts and problems
 
 ### PowerGemsPerformanceProcessor
-Monitors PowerGems performance and compatibility issues.
+- **Performance Warnings**: Monitors performance-related PowerGems messages
+- **Compatibility Issues**: Detects version and mod compatibility problems
+- **Resource Usage**: Identifies excessive resource consumption
 
-**Features:**
-- Detects performance warnings and tick lag
-- Monitors memory usage issues
-- Checks server version compatibility
-- Identifies particle effect performance problems
-- Handles effect overload situations
-- Processes async operation failures
-- Monitors plugin compatibility warnings
-- Notifies about available updates
-- Handles WorldGuard flag registration errors
+### PowerGemsCommandProcessor
+- **Command Errors**: Handles command-specific errors (GiveGem, UpgradeGem, etc.)
+- **Syntax Issues**: Detects command syntax and usage problems
+- **Permission Errors**: Identifies command permission failures
+
+## Recent Improvements
+
+- **Enhanced Debug Processing**: Now creates individual Discord embeds for each configuration manager
+- **No Value Truncation**: Complete configuration values are displayed without cutting off
+- **Better Error Categorization**: Separate processors for different error types
+- **Improved User Experience**: Clear, actionable guidance for resolving issues
+- **Proper Discord Formatting**: Uses Discord embeds instead of plain text
+
+## Technical Details
+
+All processors use the Discord embed system (`log.embed { ... }`) for proper formatting and readability. The debug processor specifically avoids truncation by:
+
+1. Creating separate embeds for each configuration manager
+2. Grouping settings into chunks to respect Discord's field limits
+3. Using full field values (up to Discord's 1024 character limit per field)
+4. Providing pagination information for large configuration dumps
 
 ## How It Works
 
@@ -76,7 +61,7 @@ Each processor uses regex patterns to match specific log patterns from PowerGems
 
 ## Integration
 
-These processors are automatically registered in the main bot application and will process any logs that contain PowerGems-related messages, providing helpful feedback to server administrators trying to troubleshoot issues.
+These processors are automatically registered in the main bot application (`App.kt`) and will process any logs that contain PowerGems-related messages, providing helpful feedback to server administrators trying to troubleshoot issues.
 
 ## Supported Log Patterns
 
@@ -90,3 +75,10 @@ The processors handle logs from:
 - WorldGuard integration
 - Database operations
 - Update notifications
+
+## Future Enhancements
+
+- Interactive navigation buttons for configuration dump browsing
+- Advanced pattern matching for new error types
+- Enhanced exception stack trace analysis
+- Configuration validation and suggestions

@@ -6,8 +6,7 @@
 
 package org.quiltmc.community.logs.plugins.powergems
 
-import dev.kord.core.behavior.channel.createEmbed
-import dev.kord.rest.builder.message.embed
+import dev.kordex.core.DISCORD_GREEN
 import org.quiltmc.community.cozy.modules.logs.data.Log
 import org.quiltmc.community.cozy.modules.logs.data.Order
 import org.quiltmc.community.cozy.modules.logs.types.LogProcessor
@@ -161,49 +160,47 @@ public class PowerGemsDebugProcessor : LogProcessor() {
 					"\n\n*Review the detailed configuration dump below.*"
 			)
 		}
-		
-		// Create paged embeds for configuration dumps
+				// Create paged embeds for configuration dumps
 		createConfigurationEmbeds(log, configMap)
 	}
-	
-	private fun createConfigurationEmbeds(log: Log, configMap: Map<String, Map<String, String>>) {
+		private fun createConfigurationEmbeds(log: Log, configMap: Map<String, Map<String, String>>) {
 		if (configMap.isEmpty()) return
 		
 		val managers = configMap.keys.toList()
-		val itemsPerPage = 3 // Number of managers per embed
-		val totalPages = (managers.size + itemsPerPage - 1) / itemsPerPage
+		val totalPages = managers.size
 		
-		for (pageIndex in 0 until totalPages) {
-			val startIndex = pageIndex * itemsPerPage
-			val endIndex = minOf(startIndex + itemsPerPage, managers.size)
-			val managersOnPage = managers.subList(startIndex, endIndex)
+		// Create individual embeds for each manager
+		managers.forEachIndexed { index, manager ->
+			val config = configMap[manager] ?: return@forEachIndexed
 			
-			val embedBuilder = StringBuilder()
-			embedBuilder.append("**PowerGems Configuration Dump (Page ${pageIndex + 1}/$totalPages)**\n\n")
-			
-			managersOnPage.forEach { manager ->
-				val config = configMap[manager] ?: return@forEach
-				embedBuilder.append("**$manager**\n")
+			log.embed {
+				title = "PowerGems Configuration: $manager"
+				description = "Configuration dump for $manager (${index + 1}/$totalPages)"
+				color = DISCORD_GREEN
 				
-				// Sort config entries and limit to avoid Discord message limits
-				val sortedEntries = config.entries.sortedBy { it.key }.take(20)
-				sortedEntries.forEach { (key, value) ->
-					val truncatedValue = if (value.length > 50) "${value.take(50)}..." else value
-					embedBuilder.append("• `$key`: $truncatedValue\n")
+				// Add all configuration entries as fields (no truncation)
+				val sortedEntries = config.entries.sortedBy { it.key }
+				
+				// Group entries into chunks to avoid field limits
+				val chunks = sortedEntries.chunked(25) // Discord embed field limit
+				
+				chunks.forEachIndexed { chunkIndex, chunk ->
+					val fieldName = if (chunks.size > 1) "Settings (Part ${chunkIndex + 1})" else "Settings"
+					val fieldValue = chunk.joinToString("\n") { (key, value) ->
+						"• `$key`: $value"
+					}
+					
+					field {
+						name = fieldName
+						value = fieldValue.take(1024) // Discord field value limit
+						inline = false
+					}
 				}
 				
-				if (config.size > 20) {
-					embedBuilder.append("• ... and ${config.size - 20} more settings\n")
+				footer {
+					text = "PowerGems Debug Dump • Use this to verify your configuration"
 				}
-				embedBuilder.append("\n")
 			}
-			
-			// Add helpful footer
-			if (pageIndex == totalPages - 1) {
-				embedBuilder.append("*Use this information to verify your PowerGems configuration.*")
-			}
-			
-			log.addMessage(embedBuilder.toString())
 		}
 	}
 }
