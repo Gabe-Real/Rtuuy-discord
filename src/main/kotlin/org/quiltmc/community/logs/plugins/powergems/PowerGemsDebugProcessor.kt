@@ -163,43 +163,81 @@ public class PowerGemsDebugProcessor : LogProcessor() {
 				// Create paged embeds for configuration dumps
 		createConfigurationEmbeds(log, configMap)
 	}
-		private fun createConfigurationEmbeds(log: Log, configMap: Map<String, Map<String, String>>) {
+	private fun createConfigurationEmbeds(log: Log, configMap: Map<String, Map<String, String>>) {
 		if (configMap.isEmpty()) return
 		
 		val managers = configMap.keys.toList()
 		val totalPages = managers.size
-		
-		// Create individual embeds for each manager
+				// Create individual embeds for each manager with strict size limits
 		managers.forEachIndexed { index, manager ->
 			val config = configMap[manager] ?: return@forEachIndexed
 			
-			log.embed {
-				title = "PowerGems Configuration: $manager"
-				description = "Configuration dump for $manager (${index + 1}/$totalPages)"
-				color = DISCORD_GREEN
+			// Calculate base embed size (title + description + footer)
+			val embedTitle = "PowerGems Config: $manager"
+			val embedDescription = "Configuration for $manager (${index + 1}/$totalPages)"
+			val embedFooter = "PowerGems Debug • Truncated if needed"
+			val baseSize = embedTitle.length + embedDescription.length + embedFooter.length + 100 // buffer for Discord formatting
+			
+			val sortedEntries = config.entries.sortedBy { it.key }
+			var currentEmbedSize = baseSize
+			val currentEntries = mutableListOf<Map.Entry<String, String>>()
+			var embedCount = 1
+			
+			fun createEmbed(entries: List<Map.Entry<String, String>>, part: Int) {
+				if (entries.isEmpty()) return
 				
-				// Add all configuration entries as fields (no truncation)
-				val sortedEntries = config.entries.sortedBy { it.key }
-				
-				// Group entries into chunks to avoid field limits
-				val chunks = sortedEntries.chunked(25) // Discord embed field limit
-				
-				chunks.forEachIndexed { chunkIndex, chunk ->
-					val fieldName = if (chunks.size > 1) "Settings (Part ${chunkIndex + 1})" else "Settings"
-					val fieldValue = chunk.joinToString("\n") { (key, value) ->
-						"• `$key`: $value"
+				log.embed {
+					title = if (part == 1) embedTitle else "$embedTitle (Part $part)"
+					description = embedDescription
+					color = DISCORD_GREEN
+					
+					// Group entries into fields, respecting size limits
+					val chunks = entries.chunked(10) // Smaller chunks for better size control
+					
+					chunks.forEach { chunk ->
+						val fieldValue = chunk.joinToString("\n") { entry ->
+							val truncatedValue = if (entry.value.length > 200) {
+								"${entry.value.take(200)}..."
+							} else entry.value
+							"• `${entry.key}`: $truncatedValue"
+						}
+						
+						field {
+							name = "Settings"
+							value = fieldValue.take(1024)
+							inline = false
+						}
 					}
 					
-					field {
-						name = fieldName
-						value = fieldValue.take(1024) // Discord field value limit
-						inline = false
+					footer {
+						text = if (entries.size < sortedEntries.size) {
+							"PowerGems Debug • Some values truncated due to size limits"
+						} else {
+							"PowerGems Debug • Complete configuration dump"
+						}
 					}
 				}
+			}
+			
+			// Process entries and split into multiple embeds if needed
+			for (entry in sortedEntries) {
+				val entrySize = entry.key.length + entry.value.take(200).length + 10 // estimate
 				
-				footer {
-					text = "PowerGems Debug Dump • Use this to verify your configuration"
+				// If adding this entry would exceed embed size limit, create current embed and start new one
+				if (currentEmbedSize + entrySize > 5500) { // Leave buffer below 6000 limit
+					createEmbed(currentEntries.toList(), embedCount)
+					currentEntries.clear()
+					currentEmbedSize = baseSize
+					embedCount++
 				}
+				
+				currentEntries.add(entry)
+				currentEmbedSize += entrySize
+			}
+			
+			// Create the final embed with remaining entries
+			if (currentEntries.isNotEmpty()) {
+				createEmbed(currentEntries.toList(), embedCount)
 			}
 		}
 	}
