@@ -29,6 +29,7 @@ import org.quiltmc.community.logs.plugins.MissingPluginProcessor
 import org.quiltmc.community.logs.plugins.PluginErrorProcessor
 import org.quiltmc.community.logs.plugins.ServerVersionCompatibilityProcessor
 import org.quiltmc.community.logs.plugins.powergems.MissingSeallibProcessor
+import org.quiltmc.community.logs.plugins.powergems.PowerGemsCommandProcessor
 import org.quiltmc.community.logs.plugins.powergems.PowerGemsDebugProcessor
 import org.quiltmc.community.logs.plugins.powergems.PowerGemsErrorProcessor
 import org.quiltmc.community.logs.plugins.powergems.PowerGemsPerformanceProcessor
@@ -138,6 +139,7 @@ suspend fun setupQuilt() = ExtensibleBot(DISCORD_TOKEN) {
 			processor(SeallibVersionProcessor())
 			processor(MissingSeallibProcessor())
 			processor(PowerGemsDebugProcessor())
+			processor(PowerGemsCommandProcessor())
 			processor(PowerGemsErrorProcessor())
 			processor(PowerGemsPlayerProcessor())
 			processor(PowerGemsPerformanceProcessor())

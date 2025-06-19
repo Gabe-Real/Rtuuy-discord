@@ -6,6 +6,8 @@
 
 package org.quiltmc.community.logs.plugins.powergems
 
+import dev.kord.core.behavior.channel.createEmbed
+import dev.kord.rest.builder.message.embed
 import org.quiltmc.community.cozy.modules.logs.data.Log
 import org.quiltmc.community.cozy.modules.logs.data.Order
 import org.quiltmc.community.cozy.modules.logs.types.LogProcessor
@@ -20,24 +22,28 @@ private val POWERGEMS_SEALUTILS_ERROR_REGEX =
 	"""\[SealUtils] The error message is ([A-Z_]+)""".toRegex()
 
 private val POWERGEMS_VERSION_REGEX =
-	"""SealLib-([\d.\w\-]+)\.jar//""".toRegex()
+	"""PowerGems-([\d.\w\-]+)\.jar//""".toRegex()
 
 private val POWERGEMS_CONFIG_DUMP_REGEX =
 	"""\[SealUtils] Dump from: ([a-zA-Z]+) -> ([a-zA-Z]+): (.+)""".toRegex()
 
-private val POWERGEMS_MANAGER_DUMP_REGEX =
-	"""\[SealUtils] Dump from: ([a-zA-Z]+) -> ([a-zA-Z]+): (.+)""".toRegex()
+private val POWERGEMS_COMMAND_ERROR_REGEX =
+	"""\[SealUtils] Exception triggered by ([a-zA-Z0-9.]+Command)""".toRegex()
+
+private val POWERGEMS_INDEX_OUT_OF_BOUNDS_REGEX =
+	"""\[SealUtils] The exception message is Index (\d+) out of bounds for length (\d+)""".toRegex()
 
 public class PowerGemsDebugProcessor : LogProcessor() {
 	override val identifier: String = "powergems_debug_processor"
 	override val order: Order = Order.Earlier
-
 	override suspend fun process(log: Log) {
 		val debugException = POWERGEMS_DEBUG_EXCEPTION_REGEX.find(log.content)
 		val fakeException = POWERGEMS_FAKE_EXCEPTION_REGEX.find(log.content)
 		val errorMessage = POWERGEMS_SEALUTILS_ERROR_REGEX.find(log.content)?.groupValues?.get(1)
-		val sealLibVersion = POWERGEMS_VERSION_REGEX.find(log.content)?.groupValues?.get(1)
+		val powerGemsVersion = POWERGEMS_VERSION_REGEX.find(log.content)?.groupValues?.get(1)
 		val configDumps = POWERGEMS_CONFIG_DUMP_REGEX.findAll(log.content).toList()
+		val commandError = POWERGEMS_COMMAND_ERROR_REGEX.find(log.content)
+		val indexOutOfBounds = POWERGEMS_INDEX_OUT_OF_BOUNDS_REGEX.find(log.content)
 		
 		// Handle fake debug exceptions
 		if (fakeException != null && errorMessage == "FAKE_EXCEPTION") {
@@ -52,13 +58,37 @@ public class PowerGemsDebugProcessor : LogProcessor() {
 		
 		// Handle real PowerGems exceptions
 		if (debugException != null && fakeException == null) {
-			val exceptionClass = debugException.groupValues[1]			log.addMessage(
-				"**PowerGems Exception Detected** \n" +
-					"Exception in class: `$exceptionClass`" +
-					(errorMessage?.let { "\nError type: `$it`" } ?: "") +
-					(sealLibVersion?.let { "\nSealLib version: `$it`" } ?: "") +
-					"\n\nCheck the full stack trace above for more details."
-			)
+			val exceptionClass = debugException.groupValues[1]
+			
+			var errorDescription = "Exception in class: `$exceptionClass`"
+			errorDescription += errorMessage?.let { "\nError type: `$it`" } ?: ""
+			errorDescription += powerGemsVersion?.let { "\nPowerGems version: `$it`" } ?: ""
+			
+			// Add specific guidance for command errors
+			if (commandError != null) {
+				val commandName = commandError.groupValues[1]
+				errorDescription += "\n\n**Command Error Detected**"
+				
+				if (indexOutOfBounds != null) {
+					val index = indexOutOfBounds.groupValues[1]
+					val length = indexOutOfBounds.groupValues[2]
+					errorDescription += "\n• Index out of bounds error: trying to access index $index in array of length $length"
+					
+					when (commandName) {
+						"dev.iseal.powergems.commands.GiveGemCommand" -> {
+							errorDescription += "\n• **Fix**: Use correct command syntax: `/givegem <player> <gem_type> [level]`"
+							errorDescription += "\n• Common issue: Missing required arguments or invalid gem type"
+						}
+						else -> {
+							errorDescription += "\n• **Fix**: Check command arguments - you may be missing required parameters"
+						}
+					}
+				}
+			}
+			
+			errorDescription += "\n\nCheck the full stack trace above for more details."
+			
+			log.addMessage("**PowerGems Exception Detected** \n$errorDescription")
 			log.hasProblems = true
 		}
 		
@@ -67,8 +97,7 @@ public class PowerGemsDebugProcessor : LogProcessor() {
 			analyzeConfigurationDumps(log, configDumps)
 		}
 	}
-	
-	private fun analyzeConfigurationDumps(log: Log, configDumps: List<MatchResult>) {
+		private fun analyzeConfigurationDumps(log: Log, configDumps: List<MatchResult>) {
 		val configMap = mutableMapOf<String, MutableMap<String, String>>()
 		
 		// Parse all configuration dumps
@@ -123,13 +152,58 @@ public class PowerGemsDebugProcessor : LogProcessor() {
 			}
 		}
 		
+		// Create summary message with issues
 		if (issues.isNotEmpty()) {
 			log.addMessage(
 				"**PowerGems Configuration Analysis** \n" +
 					"Potential configuration issues detected:\n" +
 					issues.joinToString("\n") { "• $it" } +
-					"\n\n*This analysis is based on the debug dump. Review your PowerGems configuration if needed.*"
+					"\n\n*Review the detailed configuration dump below.*"
 			)
+		}
+		
+		// Create paged embeds for configuration dumps
+		createConfigurationEmbeds(log, configMap)
+	}
+	
+	private fun createConfigurationEmbeds(log: Log, configMap: Map<String, Map<String, String>>) {
+		if (configMap.isEmpty()) return
+		
+		val managers = configMap.keys.toList()
+		val itemsPerPage = 3 // Number of managers per embed
+		val totalPages = (managers.size + itemsPerPage - 1) / itemsPerPage
+		
+		for (pageIndex in 0 until totalPages) {
+			val startIndex = pageIndex * itemsPerPage
+			val endIndex = minOf(startIndex + itemsPerPage, managers.size)
+			val managersOnPage = managers.subList(startIndex, endIndex)
+			
+			val embedBuilder = StringBuilder()
+			embedBuilder.append("**PowerGems Configuration Dump (Page ${pageIndex + 1}/$totalPages)**\n\n")
+			
+			managersOnPage.forEach { manager ->
+				val config = configMap[manager] ?: return@forEach
+				embedBuilder.append("**$manager**\n")
+				
+				// Sort config entries and limit to avoid Discord message limits
+				val sortedEntries = config.entries.sortedBy { it.key }.take(20)
+				sortedEntries.forEach { (key, value) ->
+					val truncatedValue = if (value.length > 50) "${value.take(50)}..." else value
+					embedBuilder.append("• `$key`: $truncatedValue\n")
+				}
+				
+				if (config.size > 20) {
+					embedBuilder.append("• ... and ${config.size - 20} more settings\n")
+				}
+				embedBuilder.append("\n")
+			}
+			
+			// Add helpful footer
+			if (pageIndex == totalPages - 1) {
+				embedBuilder.append("*Use this information to verify your PowerGems configuration.*")
+			}
+			
+			log.addMessage(embedBuilder.toString())
 		}
 	}
 }

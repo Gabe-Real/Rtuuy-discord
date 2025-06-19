@@ -12,8 +12,19 @@ Handles PowerGems debug output and configuration dumps.
 - Analyzes configuration dumps from debug commands
 - Provides recommendations for common configuration issues
 - Checks for debug mode, gem decay settings, cooldown configurations, and disabled gems
+- Creates paged embeds for configuration data
 
-### PowerGemsErrorProcessor  
+### PowerGemsCommandProcessor
+Specialized processor for PowerGems command errors.
+
+**Features:**
+- Detects GiveGem command errors (index out of bounds, invalid arguments)
+- Handles UpgradeGem and RemoveGem command failures
+- Provides specific command syntax guidance
+- Identifies missing arguments and null pointer errors
+- Offers examples of correct command usage
+
+### PowerGemsErrorProcessor
 Processes PowerGems error messages and warnings.
 
 **Features:**
