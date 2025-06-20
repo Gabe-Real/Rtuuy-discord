@@ -4,6 +4,7 @@ raw:
   - 'termbin\.com/([^/?#]*)'
   - 'cdn\.discordapp\.com/attachments/\d+/\d+/[^\.]\.log'
   - 'media\.discordapp\.com/attachments/\d+/\d+/[^\.]\.log'
+  - 'api\.mclo\.gs/1/raw/([^/?#]*)'
 
 url-transform:
   - match: 'mclo\.gs/([^/?#]*)'
